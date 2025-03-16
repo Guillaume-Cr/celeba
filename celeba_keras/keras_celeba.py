@@ -23,7 +23,7 @@ from utils import sample_batch, display, get_vector_from_label, add_vector_to_im
 
 # ## 0. Parameters <a name="parameters"></a>
 
-IMAGE_SIZE = 32
+IMAGE_SIZE = 128
 CHANNELS = 3
 BATCH_SIZE = 128
 NUM_FEATURES = 128
