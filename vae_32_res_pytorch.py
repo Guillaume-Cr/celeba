@@ -135,7 +135,7 @@ class EncoderModel(nn.Sequential):
         eps = torch.randn_like(std)
         x = mean + eps * std
         x *= 0.18215
-        return x
+        return mean, log_variance, x
 
 
 class DecoderModel(nn.Sequential):
@@ -173,7 +173,7 @@ class VAE(nn.Module):
         self.decoder = DecoderModel()
 
     def forward(self, x):
-        encoded = self.encoder(x)
+        mean, variance, encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return decoded, encoded
 
@@ -259,6 +259,7 @@ if __name__ == "__main__":
     transform = transforms.Compose([
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
     print(f"Dataset root: {data_dir}")
     print(f"Contents of data/celeba: {os.listdir(os.path.join(data_dir, 'celeba'))}")
