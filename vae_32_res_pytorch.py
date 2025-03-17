@@ -88,23 +88,6 @@ class ResidualBlock(nn.Module):
         return x + self.residual_layer(residue)
 
 
-class Sampling(nn.Module):
-    """
-    Sampling layer for VAE that implements the reparameterization trick
-    """
-    def __init__(self):
-        super(Sampling, self).__init__()
-
-    def forward(self, z_mean, z_log_var):
-        batch_size = z_mean.size(0)
-        latent_dim = z_mean.size(1)
-
-        # Sample from standard normal distribution
-        epsilon = torch.randn(batch_size, latent_dim, device=z_mean.device)
-
-        # Reparameterization trick: z = μ + σ * ε (where σ = exp(log_var/2))
-        return z_mean + torch.exp(0.5 * z_log_var) * epsilon
-
 class EncoderModel(nn.Sequential):
     def __init__(self):
         super().__init__(
@@ -177,27 +160,6 @@ class VAE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded, encoded, mean, variance
 
-def train_step(model, optimizer, x):
-    # Zero the gradients
-    optimizer.zero_grad()
-
-    #forward
-    z_mean, z_log_var, z = model.encoder.forward(x)
-    output = model.decoder.forward(z)
-
-    # Define KL loss
-    kl_loss = -0.5 * torch.sum(1 + z_log_var - z_mean.pow(2) - z_log_var.exp())
-
-    # Define the binary cross entropy
-    reconstruction_loss = 2000 * F.mse_loss(output, x, reduction='mean')
-
-    total_loss = kl_loss + reconstruction_loss
-
-    total_loss.backward()
-
-    optimizer.step()
-
-    return total_loss.item(), reconstruction_loss.item(), kl_loss.item()
 
 def loss_fn(recon_x, x, mu, log_var):
     BCE = F.mse_loss(recon_x, x, reduction='sum')
@@ -226,33 +188,12 @@ def train(model, dataloader, epochs=100):
             decoded, encoded, mean, variance = model(data)
             # Compute loss
             loss = loss_fn(decoded, data, mean, variance)
+            if (batch_idx % 10 == 0):
+                print("Loss: ", loss.item())
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss/len(dataloader)}')
-
-def display(
-    images, n=10, size=(20, 3), cmap="gray_r", as_type="float32", save_to=None
-):
-    """
-    Displays n random import matplotlib.pyplot as pltimages from each one of the supplied arrays.
-    """
-    if isinstance(images, torch.Tensor):
-        images = images.cpu().numpy()
-
-    images = images.transpose(0, 2, 3, 1)
-
-    plt.figure(figsize=size)
-    for i in range(n):
-        _ = plt.subplot(1, n, i + 1)
-        plt.imshow(images[i].astype(as_type), cmap=cmap)
-        plt.axis("off")
-
-    if save_to:
-        plt.savefig(save_to)
-        print(f"\nSaved to {save_to}")
-
-    plt.show()
 
 if __name__ == "__main__":
     data_dir = './data'  # Correct relative path
@@ -269,14 +210,11 @@ if __name__ == "__main__":
         transform=transform,
         download=False
     )
-    dataloader = DataLoader(celeba_dataset, batch_size=128, shuffle=True)
+    dataloader = DataLoader(celeba_dataset, batch_size=32, shuffle=True)
 
     data_batch, labels_batch = next(iter(dataloader))
 
-    display(data_batch)
-
     model = VAE()
-    init_weights(model)
 
     summary(model.encoder, input_size=(1, 3, 32, 32))
     summary(model.decoder, input_size=(1, 4, 4, 4))
