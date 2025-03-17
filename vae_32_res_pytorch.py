@@ -175,7 +175,7 @@ class VAE(nn.Module):
     def forward(self, x):
         mean, variance, encoded = self.encoder(x)
         decoded = self.decoder(encoded)
-        return decoded, encoded
+        return decoded, encoded, mean, variance
 
 def train_step(model, optimizer, x):
     # Zero the gradients
@@ -223,9 +223,9 @@ def train(model, dataloader, epochs=100):
             data = data.cuda()
             optimizer.zero_grad()
             # Forward pass
-            recon_data, mu = model(data)
+            decoded, encoded, mean, variance = model(data)
             # Compute loss
-            loss = loss_fn(recon_data, data, mu)
+            loss = loss_fn(decoded, data, mean, variance)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
@@ -259,7 +259,6 @@ if __name__ == "__main__":
     transform = transforms.Compose([
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
     print(f"Dataset root: {data_dir}")
     print(f"Contents of data/celeba: {os.listdir(os.path.join(data_dir, 'celeba'))}")
