@@ -179,6 +179,12 @@ class VAE(models.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
 
+        wandb.log({
+            "total_loss": self.total_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        })
+
         return {
             "loss": self.total_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
@@ -257,8 +263,8 @@ if LOAD_MODEL:
     vae.load_weights("./models/vae")
     tmp = vae.predict(train.take(1))
 
-if not os.path.exists("./outputs"):
-        os.makedirs("./outputs")
+if not os.path.exists("./output"):
+        os.makedirs("./output")
 
 wandb.init(project="vae-celeba-keras")
 
@@ -268,7 +274,7 @@ vae.fit(
     callbacks=[
         model_checkpoint_callback,
         tensorboard_callback,
-        ImageGenerator(num_img=10, latent_dim=Z_DIM),
+        ImageGenerator(num_img=10, latent_dim=Z_DIM, wandb_log=True),
         wandb.keras.WandbCallback()
     ],
 )
