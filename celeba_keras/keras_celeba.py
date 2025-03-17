@@ -18,6 +18,7 @@ from tensorflow.keras import (
 
 from scipy.stats import norm
 import pandas as pd
+import wandb
 
 from utils import sample_batch, display, get_vector_from_label, add_vector_to_images, morph_faces
 
@@ -231,9 +232,10 @@ tensorboard_callback = callbacks.TensorBoard(log_dir="./logs")
 
 
 class ImageGenerator(callbacks.Callback):
-    def __init__(self, num_img, latent_dim):
+    def __init__(self, num_img, latent_dim, wandb_log):
         self.num_img = num_img
         self.latent_dim = latent_dim
+        self.wandb_log = wandb_log
 
     def on_epoch_end(self, epoch, logs=None):
         random_latent_vectors = tf.random.normal(
@@ -245,11 +247,20 @@ class ImageGenerator(callbacks.Callback):
         for i in range(self.num_img):
             img = utils.array_to_img(generated_images[i])
             img.save("./output/generated_img_%03d_%d.png" % (epoch, i))
+            if self.wandb_log:
+                wandb.log({f"generated_img_{epoch:03d}_{i}": wandb.Image(f"./output/generated_img_{epoch:03d}_{i}.png")})
 
 # Load old weights if required
 if LOAD_MODEL:
+    if not os.path.exists("./models"):
+        os.makedirs("./models")
     vae.load_weights("./models/vae")
     tmp = vae.predict(train.take(1))
+
+if not os.path.exists("./outputs"):
+        os.makedirs("./outputs")
+
+wandb.init(project="vae-celeba-keras")
 
 vae.fit(
     train,
@@ -258,8 +269,11 @@ vae.fit(
         model_checkpoint_callback,
         tensorboard_callback,
         ImageGenerator(num_img=10, latent_dim=Z_DIM),
+        wandb.keras.WandbCallback()
     ],
 )
+
+wandb.finish()
 
 # Save the final models
 vae.save("./models/vae")
