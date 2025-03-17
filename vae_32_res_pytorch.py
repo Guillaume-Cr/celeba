@@ -129,19 +129,13 @@ class EncoderModel(nn.Sequential):
             if isinstance(module, nn.Conv2d) and module.stride == (2, 2):
                 x = F.pad(x, (0, 1, 0, 1))
             x = module(x)
-
-        # Split the output into mean and log variance
-        z_mean, z_log_var = torch.chunk(x, 2, dim=1)
-
-        # Clamp log variance for numerical stability
-        z_log_var = torch.clamp(z_log_var, -30, 20)
-
-        std = torch.exp(0.5 * z_log_var)
+        mean, log_variance = torch.chunk(x, 2, dim=1)
+        log_variance = torch.clamp(log_variance, -30, 20)
+        std = torch.exp(0.5 * log_variance)
         eps = torch.randn_like(std)
-        z = z_mean + eps * std
-        z *= 0.18215
-
-        return z_mean, z_log_var, z
+        x = mean + eps * std
+        x *= 0.18215
+        return x
 
 
 class DecoderModel(nn.Sequential):
@@ -174,10 +168,14 @@ class DecoderModel(nn.Sequential):
 
 class VAE(nn.Module):
     def __init__(self):
-        super(VAE, self).__init__()
-
+        super().__init__()
         self.encoder = EncoderModel()
         self.decoder = DecoderModel()
+
+    def forward(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded, encoded
 
 def train_step(model, optimizer, x):
     # Zero the gradients
@@ -201,43 +199,37 @@ def train_step(model, optimizer, x):
 
     return total_loss.item(), reconstruction_loss.item(), kl_loss.item()
 
+def loss_fn(recon_x, x, mu, log_var):
+    BCE = F.mse_loss(recon_x, x, reduction='sum')
+    # KL Divergence between the learned distribution and the standard normal distribution
+    # We use mean and log_variance from encoder
+    # Latent variable z = mu + std * eps
+    KL = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    return BCE + KL
+
 def train(model, dataloader, epochs=100):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    loss_function = lambda output, x: 2000 * F.mse_loss(output, x, reduction='mean') #Match Keras loss.
-
-    for epoch in range(epochs):
-        #Set the model to training mode (Under the hood, set compute gradients to true)
+    # Training loop
+    num_epochs = 10
+    for epoch in range(num_epochs):
         model.train()
-
         train_loss = 0
-        recon_loss_total = 0
-        kl_loss_total = 0
-
-        for batch_idx, data in enumerate(dataloader):
-            x, _ = data
-            x = x.to(device)
-
-            loss, recon_loss, kl_loss = train_step(model, optimizer, x)
-
-            train_loss += loss
-            recon_loss_total += recon_loss
-            kl_loss_total += kl_loss
-
-            if batch_idx % 100 == 0:
-                print(f'Epoch: {epoch}, Batch: {batch_idx}, Loss: {loss:.4f}, '
-                      f'Recon: {recon_loss:.4f}, KL: {kl_loss:.4f}')
-
-        avg_loss = train_loss / len(dataloader)
-        avg_recon = recon_loss_total / len(dataloader)
-        avg_kl = kl_loss_total / len(dataloader)
-
-        print(f'====> Epoch: {epoch} Average loss: {avg_loss:.4f}, '
-              f'Recon: {avg_recon:.4f}, KL: {avg_kl:.4f}')
+        for batch_idx, (data, _) in enumerate(dataloader):
+            data = data.cuda()
+            optimizer.zero_grad()
+            # Forward pass
+            recon_data, mu = model(data)
+            # Compute loss
+            loss = loss_fn(recon_data, data, mu)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss/len(dataloader)}')
 
 def display(
     images, n=10, size=(20, 3), cmap="gray_r", as_type="float32", save_to=None
