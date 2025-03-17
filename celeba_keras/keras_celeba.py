@@ -19,6 +19,7 @@ from tensorflow.keras import (
 from scipy.stats import norm
 import pandas as pd
 import wandb
+import tensorflow.keras.backend as K
 
 from utils import sample_batch, display, get_vector_from_label, add_vector_to_images, morph_faces
 
@@ -179,10 +180,12 @@ class VAE(models.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
 
+        print(total_loss.type())
+
         wandb.log({
-            "total_loss": total_loss,
-            "reconstruction_loss": reconstruction_loss,
-            "kl_loss": kl_loss
+            "total_loss": K.get_value(total_loss).item(),
+            "reconstruction_loss": K.get_value(reconstruction_loss).item(),
+            "kl_loss": K.get_value(kl_loss).item(),
         })
 
         return {
