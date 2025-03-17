@@ -177,7 +177,7 @@ def train(model, dataloader, epochs=100):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Training loop
-    num_epochs = 10
+    num_epochs = 100
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0
@@ -189,7 +189,7 @@ def train(model, dataloader, epochs=100):
             # Compute loss
             loss = loss_fn(decoded, data, mean, variance)
             if (batch_idx % 10 == 0):
-                print("Loss: ", loss.item())
+                print(f"Epoch [{epoch+1}/{num_epochs}] Loss: ", loss.item())
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
