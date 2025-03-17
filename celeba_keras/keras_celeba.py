@@ -2,6 +2,7 @@
 # In this notebook, we'll walk through the steps required to train your own variational autoencoder on the CelebA faces dataset
 
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -19,7 +20,7 @@ from tensorflow.keras import (
 from scipy.stats import norm
 import pandas as pd
 import wandb
-import tensorflow.keras.backend as K
+from wandb.integration.keras import WandbMetricsLogger
 
 from utils import sample_batch, display, get_vector_from_label, add_vector_to_images, morph_faces
 
@@ -35,13 +36,11 @@ EPOCHS = 10
 BETA = 2000
 LOAD_MODEL = False
 
-tf.compat.v1.enable_eager_execution()
-
 # ## 1. Prepare the data <a name="prepare"></a>
 
 # Load the data
 train_data = utils.image_dataset_from_directory(
-    "/home/ggrabe/celeba/data/celeba/img_align_celeba",
+    "./data/celeba/img_align_celeba",
     labels=None,
     color_mode="rgb",
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -182,12 +181,6 @@ class VAE(models.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
 
-        wandb.log({
-            "total_loss": total_loss,
-            "reconstruction_loss": reconstruction_loss,
-            "kl_loss": kl_loss
-        })
-
         return {
             "loss": self.total_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
@@ -278,7 +271,7 @@ vae.fit(
         model_checkpoint_callback,
         tensorboard_callback,
         ImageGenerator(num_img=10, latent_dim=Z_DIM, wandb_log=True),
-        wandb.keras.WandbCallback()
+        WandbMetricsLogger()
     ],
 )
 
@@ -346,14 +339,14 @@ for i in range(grid_width * grid_height):
 # ## 6. Manipulate the images <a name="manipulate"></a>
 
 # Load the label dataset
-attributes = pd.read_csv("/home/ggrabe/celeba/data/celeba/list_attr_celeba.txt")
+attributes = pd.read_csv("./data/celeba/list_attr_celeba.txt")
 print(attributes.columns)
 attributes.head()
 
 # Load the face data with label attached
 LABEL = "Blond_Hair"  # <- Set this label
 labelled_test = utils.image_dataset_from_directory(
-    "/home/ggrabe/celeba/data/celeba/img_align_celeba",
+    "./data/celeba/img_align_celeba",
     labels=attributes[LABEL].tolist(),
     color_mode="rgb",
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
