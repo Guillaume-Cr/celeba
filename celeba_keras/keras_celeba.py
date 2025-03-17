@@ -180,9 +180,9 @@ class VAE(models.Model):
         self.kl_loss_tracker.update_state(kl_loss)
 
         wandb.log({
-            "total_loss": self.total_loss_tracker.result(),
-            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
-            "kl_loss": self.kl_loss_tracker.result(),
+            "total_loss": self.total_loss_tracker.result().numpy().item(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result().numpy().item(),
+            "kl_loss": self.kl_loss_tracker.result().numpy().item(),
         })
 
         return {
