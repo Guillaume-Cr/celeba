@@ -180,9 +180,9 @@ class VAE(models.Model):
         self.kl_loss_tracker.update_state(kl_loss)
 
         wandb.log({
-            "total_loss": tf.reduce_mean(tf.identity(self.total_loss_tracker.result())).numpy().item(),
-            "reconstruction_loss": tf.reduce_mean(tf.identity(self.reconstruction_loss_tracker.result())).numpy().item(),
-            "kl_loss": tf.reduce_mean(tf.identity(self.kl_loss_tracker.result())).numpy().item(),
+            "total_loss": total_loss,
+            "reconstruction_loss": reconstruction_loss,
+            "kl_loss": kl_loss
         })
 
         return {
