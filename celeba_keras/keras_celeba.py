@@ -35,6 +35,8 @@ EPOCHS = 10
 BETA = 2000
 LOAD_MODEL = False
 
+tf.compat.v1.enable_eager_execution()
+
 # ## 1. Prepare the data <a name="prepare"></a>
 
 # Load the data
@@ -180,12 +182,10 @@ class VAE(models.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
 
-        print(total_loss.type())
-
         wandb.log({
-            "total_loss": K.get_value(total_loss).item(),
-            "reconstruction_loss": K.get_value(reconstruction_loss).item(),
-            "kl_loss": K.get_value(kl_loss).item(),
+            "total_loss": total_loss,
+            "reconstruction_loss": reconstruction_loss,
+            "kl_loss": kl_loss
         })
 
         return {
