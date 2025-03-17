@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import math
 from torchinfo import summary
+import wandb
 
 ## Define my encoder model
 
@@ -160,24 +161,17 @@ class VAE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded, encoded, mean, variance
 
-
-def loss_fn(recon_x, x, mu, log_var):
-    BCE = F.mse_loss(recon_x, x, reduction='sum')
-    # KL Divergence between the learned distribution and the standard normal distribution
-    # We use mean and log_variance from encoder
-    # Latent variable z = mu + std * eps
-    KL = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-    return BCE + KL
-
 def train(model, dataloader, epochs=100):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     model.to(device)
 
+    wandb.init(project="vae-celeba-pytorch-res")
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Training loop
-    num_epochs = 100
+    num_epochs = 11
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0
@@ -187,13 +181,46 @@ def train(model, dataloader, epochs=100):
             # Forward pass
             decoded, encoded, mean, variance = model(data)
             # Compute loss
-            loss = loss_fn(decoded, data, mean, variance)
+            BCE = F.mse_loss(decoded, data, reduction='sum')
+            # KL Divergence between the learned distribution and the standard normal distribution
+            # We use mean and log_variance from encoder
+            # Latent variable z = mu + std * eps
+            KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
+            loss = BCE + KL
+
             if (batch_idx % 10 == 0):
                 print(f"Epoch [{epoch+1}/{num_epochs}] Loss: ", loss.item())
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            recon_loss += BCE.item()
+            kl_loss += KL.item()
+
+        avg_loss = train_loss/len(dataloader)
+        avg_recon = recon_loss/len(dataloader)
+        avg_kl = kl_loss/len(dataloader)
+        
+        # Log metrics to wandb
+        wandb.log({
+            "epoch": epoch,
+            "avg_loss": avg_loss,
+            "avg_recon_loss": avg_recon,
+            "avg_kl_loss": avg_kl,
+        })
+
+        if epoch % 5 == 0: # log every 5 epochs
+            model.eval()
+            with torch.no_grad():
+                sample_data, _ = next(iter(dataloader))
+                sample_data = sample_data.to(device)
+                _, _, z = model.encoder(sample_data[:10])
+                reconstructed_images = model.decoder(z).cpu()
+                display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
+                wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
+            model.train()
+
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss/len(dataloader)}')
+    wandb.finish()
 
 if __name__ == "__main__":
     data_dir = './data'  # Correct relative path

@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torchinfo import summary
+import wandb
 
 ## Define my encoder model
 
@@ -163,7 +164,7 @@ def train(model, dataloader, epochs=100):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 
-    loss_function = lambda output, x: 2000 * F.mse_loss(output, x, reduction='mean') #Match Keras loss.
+    wandb.init(project="vae-celeba-pytorch")
 
     for epoch in range(epochs):
         #Set the model to training mode (Under the hood, set compute gradients to true)
@@ -193,6 +194,28 @@ def train(model, dataloader, epochs=100):
 
         print(f'====> Epoch: {epoch} Average loss: {avg_loss:.4f}, '
               f'Recon: {avg_recon:.4f}, KL: {avg_kl:.4f}')
+        
+        # Log metrics to wandb
+        wandb.log({
+            "epoch": epoch,
+            "avg_loss": avg_loss,
+            "avg_recon_loss": avg_recon,
+            "avg_kl_loss": avg_kl,
+        })
+
+        # Generate and log sample images
+        if epoch % 5 == 0: # log every 5 epochs
+            model.eval()
+            with torch.no_grad():
+                sample_data, _ = next(iter(dataloader))
+                sample_data = sample_data.to(device)
+                _, _, z = model.encoder(sample_data[:10])
+                reconstructed_images = model.decoder(z).cpu()
+                display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
+                wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
+            model.train()
+
+    wandb.finish()
 
 def display(
     images, n=10, size=(20, 3), cmap="gray_r", as_type="float32", save_to=None
