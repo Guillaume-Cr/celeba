@@ -141,15 +141,16 @@ def train_step(model, optimizer, x):
 
     #forward
     z_mean, z_log_var, z = model.encoder.forward(x)
+    print(z)
     output = model.decoder.forward(z)
 
     # Define KL loss
     kl_loss = -0.5 * torch.sum(1 + z_log_var - z_mean.pow(2) - z_log_var.exp())
 
     # Define the binary cross entropy
-    reconstruction_loss = 2000 * F.mse_loss(output, x, reduction='mean')
+    reconstruction_loss = F.mse_loss(output, x, reduction='mean')
 
-    total_loss = kl_loss + reconstruction_loss
+    total_loss = 20000 * kl_loss + 0.01 * reconstruction_loss
 
     total_loss.backward()
 
@@ -210,9 +211,18 @@ def train(model, dataloader, epochs=100):
                 sample_data, _ = next(iter(dataloader))
                 sample_data = sample_data.to(device)
                 _, _, z = model.encoder(sample_data[:10])
+                print("Latent space for the images: ", z)
                 reconstructed_images = model.decoder(z).cpu()
+                input_images = sample_data[:10].cpu()
+                
+                 # Display and log input images
+                display(input_images, save_to=f"input_epoch_{epoch}.png")
+                wandb.log({f"input_images_epoch_{epoch}": wandb.Image(f"input_epoch_{epoch}.png")})
+
+                # Display and log reconstructed images
                 display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
                 wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
+
             model.train()
 
     wandb.finish()
@@ -267,4 +277,4 @@ if __name__ == "__main__":
     summary(model.encoder, input_size=(1, 3, 32, 32))
     summary(model.decoder, input_size=(1, 200))
 
-    train(model, dataloader, epochs=10)
+    train(model, dataloader, epochs=11)
