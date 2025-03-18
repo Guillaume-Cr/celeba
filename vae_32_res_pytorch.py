@@ -177,9 +177,13 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
         recon_loss = 0
         kl_loss = 0
 
-        progress_bar = tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch [{epoch+1}/{epochs}]")
+        if accelerator is None:
+            progress_bar = tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch [{epoch+1}/{epochs}]")
+        else:
+            total_batches = len(dataloader) * accelerator.num_processes if accelerator is not None else len(dataloader)
+            progress_bar = tqdm(enumerate(dataloader), total=total_batches, desc=f"Epoch [{epoch+1}/{epochs}]")
 
-        for batch_idx, (data, _) in enumerate(dataloader):
+        for batch_idx, (data, _) in progress_bar:
             if accelerator is None:
                 data = data.cuda()
             optimizer.zero_grad()
@@ -194,7 +198,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             loss = 2000000 * BCE + KL
 
             if accelerator is None:
-                    progress_bar.set_postfix({"Loss": loss.item()})
+                progress_bar.set_postfix({"Loss": loss.item()})
             else:
                 progress_bar.set_postfix({"Loss": accelerator.gather(loss).mean().item()})
             if accelerator is None:
@@ -225,18 +229,17 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             "avg_kl_loss": avg_kl,
         })
 
-        if (epoch + 1) % 5 == 0: # log every 5 epochs
-            model.eval()
-            with torch.no_grad():
-                sample_data, _ = next(iter(dataloader))
-                if accelerator is None:
-                    sample_data = sample_data.cuda()
-                unwrapped_model = accelerator.unwrap_model(model)
-                _, _, z = unwrapped_model.encoder(sample_data[:10])
-                reconstructed_images = unwrapped_model.decoder(z).cpu()
-                display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
-                wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
-            model.train()
+        model.eval()
+        with torch.no_grad():
+            sample_data, _ = next(iter(dataloader))
+            if accelerator is None:
+                sample_data = sample_data.cuda()
+            unwrapped_model = accelerator.unwrap_model(model)
+            _, _, z = unwrapped_model.encoder(sample_data[:10])
+            reconstructed_images = unwrapped_model.decoder(z).cpu()
+            display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
+            wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
+        model.train()
 
         # Save model at fixed checkpoints
         if (epoch + 1) % save_every == 0:
@@ -286,12 +289,12 @@ if __name__ == "__main__":
         transform=transform,
         download=False
     )
-    dataloader = DataLoader(celeba_dataset, batch_size=64, shuffle=True)
+    dataloader = DataLoader(celeba_dataset, batch_size=50, shuffle=True)
 
     data_batch, labels_batch = next(iter(dataloader))
 
     model = VAE()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 
     accelerator = Accelerator() # initialize accelerator
     model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader) #prepare model
@@ -300,4 +303,4 @@ if __name__ == "__main__":
     summary(unwrapped_model.encoder, input_size=(1, 3, 128, 128))
     summary(unwrapped_model.decoder, input_size=(1, 4, 4, 4))
 
-    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator, save_every=10)
+    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator, save_every=5)
