@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import math
 from torchinfo import summary
 import wandb
+from accelerate import Accelerator
 
 ## Define my encoder model
 
@@ -161,24 +162,22 @@ class VAE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded, encoded, mean, variance
 
-def train(model, dataloader, epochs=100):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    model.to(device)
-
+def train(model, dataloader, optimizer, epochs=100, accelerator=None):
+    if accelerator is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+        model.to(device)
     wandb.init(project="vae-celeba-pytorch-res")
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
     # Training loop
-    num_epochs = 11
-    for epoch in range(num_epochs):
+    for epoch in range(epochs):
         model.train()
         train_loss = 0
         recon_loss = 0
         kl_loss = 0
         for batch_idx, (data, _) in enumerate(dataloader):
-            data = data.cuda()
+            if accelerator is None:
+                data = data.cuda()
             optimizer.zero_grad()
             # Forward pass
             decoded, encoded, mean, variance = model(data)
@@ -190,13 +189,25 @@ def train(model, dataloader, epochs=100):
             KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
             loss = 2000000 * BCE + KL
 
-            if (batch_idx % 10 == 0):
-                print(f"Epoch [{epoch+1}/{num_epochs}] Loss: ", loss.item())
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            recon_loss += BCE.item()
-            kl_loss += KL.item()
+            if accelerator is None:
+                    print(f"Epoch [{epoch+1}/{epochs}] Loss: ", loss.item())
+            else:
+                print(f"Epoch [{epoch+1}/{epochs}] Loss: ", accelerator.gather(loss).mean().item())
+            if accelerator is None:
+                loss.backward()
+                optimizer.step()
+            else:
+                accelerator.backward(loss)
+                optimizer.step()
+
+            if accelerator is None:
+                train_loss += loss.item()
+                recon_loss += BCE.item()
+                kl_loss += KL.item()
+            else:
+                train_loss += accelerator.gather(loss).mean().item()
+                recon_loss += accelerator.gather(BCE).mean().item()
+                kl_loss += accelerator.gather(KL).mean().item()
 
         avg_loss = train_loss/len(dataloader)
         avg_recon = recon_loss/len(dataloader)
@@ -214,14 +225,16 @@ def train(model, dataloader, epochs=100):
             model.eval()
             with torch.no_grad():
                 sample_data, _ = next(iter(dataloader))
-                sample_data = sample_data.to(device)
-                _, _, z = model.encoder(sample_data[:10])
-                reconstructed_images = model.decoder(z).cpu()
+                if accelerator is None:
+                    sample_data = sample_data.cuda()
+                unwrapped_model = accelerator.unwrap_model(model)
+                _, _, z = unwrapped_model.encoder(sample_data[:10])
+                reconstructed_images = unwrapped_model.decoder(z).cpu()
                 display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
                 wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
             model.train()
 
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss/len(dataloader)}')
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {train_loss/len(dataloader)}')
     wandb.finish()
 
 def display(
@@ -267,8 +280,13 @@ if __name__ == "__main__":
     data_batch, labels_batch = next(iter(dataloader))
 
     model = VAE()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    summary(model.encoder, input_size=(1, 3, 32, 32))
-    summary(model.decoder, input_size=(1, 4, 4, 4))
+    accelerator = Accelerator() # initialize accelerator
+    model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader) #prepare model
 
-    train(model, dataloader, epochs=100)
+    unwrapped_model = accelerator.unwrap_model(model)
+    summary(unwrapped_model.encoder, input_size=(1, 3, 128, 128))
+    summary(unwrapped_model.decoder, input_size=(1, 4, 4, 4))
+
+    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator)
