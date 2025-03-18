@@ -10,6 +10,7 @@ import math
 from torchinfo import summary
 import wandb
 from accelerate import Accelerator
+from tqdm import tqdm
 
 ## Define my encoder model
 
@@ -175,6 +176,9 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
         train_loss = 0
         recon_loss = 0
         kl_loss = 0
+
+        progress_bar = tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch [{epoch+1}/{epochs}]")
+
         for batch_idx, (data, _) in enumerate(dataloader):
             if accelerator is None:
                 data = data.cuda()
@@ -190,9 +194,9 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             loss = 2000000 * BCE + KL
 
             if accelerator is None:
-                    print(f"Epoch [{epoch+1}/{epochs}] Loss: ", loss.item())
+                    progress_bar.set_postfix({"Loss": loss.item()})
             else:
-                print(f"Epoch [{epoch+1}/{epochs}] Loss: ", accelerator.gather(loss).mean().item())
+                progress_bar.set_postfix({"Loss": accelerator.gather(loss).mean().item()})
             if accelerator is None:
                 loss.backward()
                 optimizer.step()
@@ -282,7 +286,7 @@ if __name__ == "__main__":
         transform=transform,
         download=False
     )
-    dataloader = DataLoader(celeba_dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(celeba_dataset, batch_size=64, shuffle=True)
 
     data_batch, labels_batch = next(iter(dataloader))
 
