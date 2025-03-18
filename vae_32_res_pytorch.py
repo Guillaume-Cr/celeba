@@ -250,7 +250,7 @@ def display(
 if __name__ == "__main__":
     data_dir = './data'  # Correct relative path
     transform = transforms.Compose([
-        transforms.Resize((64, 64)),
+        transforms.Resize((128, 128)),
         transforms.ToTensor(),
     ])
     print(f"Dataset root: {data_dir}")
@@ -271,4 +271,4 @@ if __name__ == "__main__":
     summary(model.encoder, input_size=(1, 3, 32, 32))
     summary(model.decoder, input_size=(1, 4, 4, 4))
 
-    train(model, dataloader, epochs=10)
+    train(model, dataloader, epochs=100)
