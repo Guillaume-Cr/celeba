@@ -175,6 +175,8 @@ def train(model, dataloader, epochs=100):
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0
+        recon_loss = 0
+        kl_loss = 0
         for batch_idx, (data, _) in enumerate(dataloader):
             data = data.cuda()
             optimizer.zero_grad()
@@ -186,7 +188,7 @@ def train(model, dataloader, epochs=100):
             # We use mean and log_variance from encoder
             # Latent variable z = mu + std * eps
             KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
-            loss = BCE + KL
+            loss = 2000000 * BCE + KL
 
             if (batch_idx % 10 == 0):
                 print(f"Epoch [{epoch+1}/{num_epochs}] Loss: ", loss.item())
@@ -221,6 +223,29 @@ def train(model, dataloader, epochs=100):
 
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss/len(dataloader)}')
     wandb.finish()
+
+def display(
+    images, n=10, size=(20, 3), cmap="gray_r", as_type="float32", save_to=None
+):
+    """
+    Displays n random import matplotlib.pyplot as pltimages from each one of the supplied arrays.
+    """
+    if isinstance(images, torch.Tensor):
+        images = images.cpu().numpy()
+
+    images = images.transpose(0, 2, 3, 1)
+
+    plt.figure(figsize=size)
+    for i in range(n):
+        _ = plt.subplot(1, n, i + 1)
+        plt.imshow(images[i].astype(as_type), cmap=cmap)
+        plt.axis("off")
+
+    if save_to:
+        plt.savefig(save_to)
+        print(f"\nSaved to {save_to}")
+
+    plt.show()
 
 if __name__ == "__main__":
     data_dir = './data'  # Correct relative path
