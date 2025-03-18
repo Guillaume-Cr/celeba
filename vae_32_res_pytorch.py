@@ -162,7 +162,7 @@ class VAE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded, encoded, mean, variance
 
-def train(model, dataloader, optimizer, epochs=100, accelerator=None):
+def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every=10, save_dir="./saved_models"):
     if accelerator is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
@@ -221,7 +221,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None):
             "avg_kl_loss": avg_kl,
         })
 
-        if epoch % 5 == 0: # log every 5 epochs
+        if (epoch + 1) % 5 == 0: # log every 5 epochs
             model.eval()
             with torch.no_grad():
                 sample_data, _ = next(iter(dataloader))
@@ -233,6 +233,13 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None):
                 display(reconstructed_images, save_to=f"reconstructed_epoch_{epoch}.png")
                 wandb.log({f"reconstructed_images_epoch_{epoch}": wandb.Image(f"reconstructed_epoch_{epoch}.png")})
             model.train()
+
+        # Save model at fixed checkpoints
+        if (epoch + 1) % save_every == 0:
+            unwrapped_model = accelerator.unwrap_model(model) # Get the original model
+            if accelerator.is_main_process: # Only save on the main process
+                torch.save(unwrapped_model.state_dict(), os.path.join(save_dir, f"vae_epoch_{epoch + 1}.pth"))
+                print(f"Saved model at epoch {epoch + 1}")
 
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {train_loss/len(dataloader)}')
     wandb.finish()
@@ -289,4 +296,4 @@ if __name__ == "__main__":
     summary(unwrapped_model.encoder, input_size=(1, 3, 128, 128))
     summary(unwrapped_model.decoder, input_size=(1, 4, 4, 4))
 
-    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator)
+    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator, save_every=10)
