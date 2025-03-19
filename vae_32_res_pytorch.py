@@ -164,6 +164,10 @@ class VAE(nn.Module):
         return decoded, encoded, mean, variance
 
 def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every=10, save_dir="./saved_models"):
+
+    if os.path.exists(save_dir) is False:
+        os.makedirs(save_dir)
+
     if accelerator is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
