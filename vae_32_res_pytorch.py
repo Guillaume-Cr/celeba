@@ -293,7 +293,7 @@ if __name__ == "__main__":
         transform=transform,
         download=False
     )
-    dataloader = DataLoader(celeba_dataset, batch_size=50, shuffle=True)
+    dataloader = DataLoader(celeba_dataset, batch_size=64, shuffle=True)
 
     data_batch, labels_batch = next(iter(dataloader))
 
