@@ -163,7 +163,7 @@ class VAE(nn.Module):
         decoded = self.decoder(encoded)
         return decoded, encoded, mean, variance
 
-def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every=10, save_dir="./saved_models"):
+def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every=1, save_dir="./saved_models"):
 
     if os.path.exists(save_dir) is False:
         os.makedirs(save_dir)
@@ -246,7 +246,10 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
         model.train()
 
         # Save model at fixed checkpoints
-        if (epoch + 1) % save_every == 0:
+        if accelerator is None:
+            torch.save(model.state_dict(), os.path.join(save_dir, f"vae_epoch_{epoch + 1}.pth"))
+            print(f"Saved model at epoch {epoch + 1}")
+        else:
             unwrapped_model = accelerator.unwrap_model(model) # Get the original model
             if accelerator.is_main_process: # Only save on the main process
                 torch.save(unwrapped_model.state_dict(), os.path.join(save_dir, f"vae_epoch_{epoch + 1}.pth"))
