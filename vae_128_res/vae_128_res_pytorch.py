@@ -1,15 +1,13 @@
 import os
 import torch
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import math
-from torchinfo import summary
+
 import wandb
-from accelerate import Accelerator
+
 from tqdm import tqdm
 
 ## Define my encoder model
@@ -106,8 +104,8 @@ class EncoderModel(nn.Sequential):
             ResidualBlock(512, 512),
             nn.GroupNorm(32, 512),
             nn.SiLU(),
-            nn.Conv2d(512, 8, kernel_size=3, padding=1),
-            nn.Conv2d(8, 8, kernel_size=1, padding=0)
+            nn.Conv2d(512, 64, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=1, padding=0)
         )
 
     def forward(self, x):
@@ -127,7 +125,7 @@ class EncoderModel(nn.Sequential):
 class DecoderModel(nn.Sequential):
     def __init__(self):
         super().__init__(
-            nn.Conv2d(4, 512, kernel_size=3, padding=1),
+            nn.Conv2d(32, 512, kernel_size=3, padding=1),
             ResidualBlock(512, 512),
             AttentionBlock(512),
             ResidualBlock(512, 512),
@@ -281,33 +279,3 @@ def display(
 
     plt.show()
 
-if __name__ == "__main__":
-    data_dir = './data'  # Correct relative path
-    transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),
-    ])
-    print(f"Dataset root: {data_dir}")
-    print(f"Contents of data/celeba: {os.listdir(os.path.join(data_dir, 'celeba'))}")
-    celeba_dataset = datasets.CelebA(
-        root=data_dir,
-        split='all',
-        target_type='attr',
-        transform=transform,
-        download=False
-    )
-    dataloader = DataLoader(celeba_dataset, batch_size=64, shuffle=True)
-
-    data_batch, labels_batch = next(iter(dataloader))
-
-    model = VAE()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
-
-    accelerator = Accelerator() # initialize accelerator
-    model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader) #prepare model
-
-    unwrapped_model = accelerator.unwrap_model(model)
-    summary(unwrapped_model.encoder, input_size=(1, 3, 128, 128))
-    summary(unwrapped_model.decoder, input_size=(1, 4, 4, 4))
-
-    train(model, dataloader,optimizer, epochs=100, accelerator=accelerator, save_every=5)
