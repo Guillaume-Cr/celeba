@@ -185,7 +185,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             total_batches = len(dataloader) * accelerator.num_processes if accelerator is not None else len(dataloader)
             progress_bar = tqdm(enumerate(dataloader), total=total_batches, desc=f"Epoch [{epoch+1}/{epochs}]")
 
-        for batch_idx, (data, _) in progress_bar:
+        for batch_idx, data in progress_bar:
             if accelerator is None:
                 data = data.cuda()
             optimizer.zero_grad()

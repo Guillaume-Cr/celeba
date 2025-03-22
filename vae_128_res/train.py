@@ -37,7 +37,7 @@ if __name__ == "__main__":
     celeba_dataset = CustomCelebADataset(img_dir=data_dir, transform=transform)
     dataloader = DataLoader(celeba_dataset, batch_size=64, shuffle=True)
 
-    data_batch, labels_batch = next(iter(dataloader))
+    data_batch = next(iter(dataloader))
 
     model = VAE()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
