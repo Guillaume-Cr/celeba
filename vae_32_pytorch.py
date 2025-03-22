@@ -228,7 +228,7 @@ def train(model, dataloader, epochs=100):
         if epoch % 5 == 0: # log every 5 epochs
             model.eval()
             with torch.no_grad():
-                sample_data, _ = next(iter(dataloader))
+                sample_data = next(iter(dataloader))
                 sample_data = sample_data.to(device)
                 _, _, z = model.encoder(sample_data[:10])
                 print("Latent space for the images: ", z)

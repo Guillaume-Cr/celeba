@@ -197,7 +197,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             # We use mean and log_variance from encoder
             # Latent variable z = mu + std * eps
             KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
-            loss = 2000000 * BCE + KL
+            loss = BCE + KL
 
             if accelerator is None:
                 progress_bar.set_postfix({"Loss": loss.item()})
@@ -233,7 +233,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
 
         model.eval()
         with torch.no_grad():
-            sample_data, _ = next(iter(dataloader))
+            sample_data = next(iter(dataloader))
             if accelerator is None:
                 sample_data = sample_data.cuda()
             unwrapped_model = accelerator.unwrap_model(model)
