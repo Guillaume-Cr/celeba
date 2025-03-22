@@ -2,12 +2,32 @@ import os
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torchinfo import summary
 import wandb
+
+class CustomCelebADataset(Dataset):
+    def __init__(self, img_dir, transform=None):
+        self.img_dir = img_dir
+        self.transform = transform
+        self.img_files = sorted([f for f in os.listdir(img_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+    def __len__(self):
+        return len(self.img_files)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.img_dir, self.img_files[idx])
+        image = Image.open(img_path).convert('RGB')  # Ensure RGB
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image
 
 ## Define my encoder model
 
@@ -251,23 +271,16 @@ def display(
     plt.show()
 
 if __name__ == "__main__":
-    data_dir = './data'  # Correct relative path
+    data_dir = './data/celeba/img_align_celeba/'  # Correct relative path
     transform = transforms.Compose([
         transforms.Resize((32, 32)),
         transforms.ToTensor(),
     ])
     print(f"Dataset root: {data_dir}")
-    print(f"Contents of data/celeba: {os.listdir(os.path.join(data_dir, 'celeba'))}")
-    celeba_dataset = datasets.CelebA(
-        root=data_dir,
-        split='all',
-        target_type='attr',
-        transform=transform,
-        download=False
-    )
+    celeba_dataset = CustomCelebADataset(img_dir=data_dir, transform=transform)
     dataloader = DataLoader(celeba_dataset, batch_size=128, shuffle=True)
 
-    data_batch, labels_batch = next(iter(dataloader))
+    data_batch = next(iter(dataloader))
 
     display(data_batch)
 
