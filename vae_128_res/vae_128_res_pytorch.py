@@ -197,7 +197,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             # We use mean and log_variance from encoder
             # Latent variable z = mu + std * eps
             KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
-            loss = 2000 * BCE + KL
+            loss = 200000 * BCE + KL
 
             if accelerator is None:
                 progress_bar.set_postfix({"Loss": loss.item()})
