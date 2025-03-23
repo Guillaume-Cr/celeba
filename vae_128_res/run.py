@@ -29,7 +29,7 @@ def process_image(image_path, device):
 def get_latent_and_reconstruction(model, image_tensor):
     """Gets the latent vector and reconstruction from the model."""
     with torch.no_grad():
-        latent, mean, variance = model.encoder(image_tensor)
+        mean, variance, latent = model.encoder(image_tensor)
         reconstructed_image = model.decoder(latent)
     return latent, reconstructed_image
 
@@ -55,7 +55,7 @@ def display_images(original_image, reconstructed_image):
 def main():
     parser = argparse.ArgumentParser(description="VAE Image Processing")
     parser.add_argument("image_path", type=str, help="Path to the input image")
-    parser.add_argument("--model_path", type=str, default="saved_models/vae_epoch_5.pth", help="Path to the trained VAE model")
+    parser.add_argument("--model_path", type=str, default="saved_models/vae_epoch_12.pth", help="Path to the trained VAE model")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

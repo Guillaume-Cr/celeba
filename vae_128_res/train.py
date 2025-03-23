@@ -47,6 +47,6 @@ if __name__ == "__main__":
 
     unwrapped_model = accelerator.unwrap_model(model)
     summary(unwrapped_model.encoder, input_size=(1, 3, 128, 128))
-    summary(unwrapped_model.decoder, input_size=(1, 32, 32, 32))
+    summary(unwrapped_model.decoder, input_size=(1, 4, 4, 4))
 
     train(model, dataloader,optimizer, epochs=100, accelerator=accelerator, save_every=5)

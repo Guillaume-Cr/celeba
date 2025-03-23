@@ -104,8 +104,8 @@ class EncoderModel(nn.Sequential):
             ResidualBlock(512, 512),
             nn.GroupNorm(32, 512),
             nn.SiLU(),
-            nn.Conv2d(512, 64, kernel_size=3, padding=1),
-            nn.Conv2d(64, 64, kernel_size=1, padding=0)
+            nn.Conv2d(512, 8, kernel_size=3, padding=1),
+            nn.Conv2d(8, 8, kernel_size=1, padding=0)
         )
 
     def forward(self, x):
@@ -125,7 +125,7 @@ class EncoderModel(nn.Sequential):
 class DecoderModel(nn.Sequential):
     def __init__(self):
         super().__init__(
-            nn.Conv2d(32, 512, kernel_size=3, padding=1),
+            nn.Conv2d(4, 512, kernel_size=3, padding=1),
             ResidualBlock(512, 512),
             AttentionBlock(512),
             ResidualBlock(512, 512),
@@ -197,7 +197,7 @@ def train(model, dataloader, optimizer, epochs=100, accelerator=None, save_every
             # We use mean and log_variance from encoder
             # Latent variable z = mu + std * eps
             KL = -0.5 * torch.sum(1 + variance - mean.pow(2) - variance.exp())
-            loss = BCE + KL
+            loss = 2000 * BCE + KL
 
             if accelerator is None:
                 progress_bar.set_postfix({"Loss": loss.item()})
